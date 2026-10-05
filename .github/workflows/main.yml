@@ -4,6 +4,10 @@ on:
   push:
     branches: [ "main" ]
 
+concurrency:
+  group: scoring-api
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: self-hosted
@@ -28,11 +32,8 @@ jobs:
     needs: test
     runs-on: self-hosted
     timeout-minutes: 720
-    concurrency:
-      group: scoring-api
-      cancel-in-progress: true
     env:
-      URLBDD: ${{ secrets.DOCKERURLBDD }}
+      URLBDD: ${{ secrets.DockerURLBDD }}
     steps:
       - uses: actions/checkout@v4
 
@@ -43,5 +44,17 @@ jobs:
       - name: Construire l'image Docker
         run: docker build -t scoring-api .
 
-      - name: Lancer l'API (Docker)
-        run: docker run --rm -p 8000:8000 -e URLBDD --name scoring-api scoring-api
+      - name: Lancer l'API (Docker, en arrière-plan)
+        run: docker run -d -p 8000:8000 -e URLBDD --name scoring-api scoring-api
+
+      - name: Vérifier que l'API répond
+        run: |
+          Start-Sleep -Seconds 10
+          Invoke-WebRequest -Uri http://localhost:8000/docs -UseBasicParsing
+
+      - name: Afficher les logs du conteneur
+        if: always()
+        run: docker logs scoring-api
+
+      - name: API en ligne, attente de l'arrêt (docker stop scoring-api)
+        run: docker wait scoring-api
