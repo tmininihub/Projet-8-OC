@@ -32,7 +32,7 @@ jobs:
       group: scoring-api
       cancel-in-progress: true
     env:
-      URLBDD: ${{ secrets.DockerURLBDD }}
+      URLBDD: ${{ secrets.DOCKERURLBDD }}
     steps:
       - uses: actions/checkout@v4
 
