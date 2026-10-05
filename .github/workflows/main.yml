@@ -1,34 +1,47 @@
-name: Docker Image CI
+name: CI-CD
 
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
 
 jobs:
-
-  build-and-deploy:
-    runs-on: ubuntu-latest
-
+  test:
+    runs-on: self-hosted
+    env:
+      URLBDD: ${{ secrets.URLBDD }}
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Build the Docker image
-      run: docker build . --file Dockerfile --tag my-image-name:latest
+      - name: Installer les dépendances
+        run: python -m pip install -r requirements.txt
 
-    - name: Run the container
-      run: docker run -d -p 8000:8000 --name test-container my-image-name:latest
+      - name: Lancer les tests avec couverture
+        run: python -m pytest --cov=main --cov-report=term-missing --cov-report=xml
 
-    - name: Check that the API responds
-      run: |
-        sleep 10
-        curl --fail http://localhost:8000/docs
+      - name: Sauvegarder le rapport de couverture
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
 
-    - name: Show container logs
-      if: always()
-      run: docker logs test-container
+  deploy:
+    needs: test
+    runs-on: self-hosted
+    timeout-minutes: 720
+    concurrency:
+      group: scoring-api
+      cancel-in-progress: true
+    env:
+      URLBDD: ${{ secrets.URLBDD }}
+    steps:
+      - uses: actions/checkout@v4
 
-    - name: Stop the container
-      if: always()
-      run: docker stop test-container
+      - name: Nettoyer l'ancien conteneur
+        run: docker rm -f scoring-api
+        continue-on-error: true
+
+      - name: Construire l'image Docker
+        run: docker build -t scoring-api .
+
+      - name: Lancer l'API (Docker)
+        run: docker run --rm -p 8000:8000 -e URLBDD --name scoring-api scoring-api
