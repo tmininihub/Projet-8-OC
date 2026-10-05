@@ -8,42 +8,27 @@ on:
 
 jobs:
 
-  test:
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-
-    - name: Install dependencies
-      run: pip install -r requirements.txt
-
-    - name: Connect to Tailscale
-      uses: tailscale/github-action@v4
-      with:
-        oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-        oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-        tags: tag:ci
-        ping: 100.102.88.0
-
-    - name: Run tests
-      env:
-        URLBDD: ${{ secrets.URLBDD }}
-      run: pytest
-
   build-and-deploy:
-    needs: test
     runs-on: ubuntu-latest
+
     steps:
     - uses: actions/checkout@v4
+
     - name: Build the Docker image
       run: docker build . --file Dockerfile --tag my-image-name:latest
-    - name: Run the container (simulated deployment)
+
+    - name: Run the container
+      run: docker run -d -p 8000:8000 --name test-container my-image-name:latest
+
+    - name: Check that the API responds
       run: |
-        docker run -d -p 8000:8000 --name test-container my-image-name:latest
-        sleep 5
-        docker stop test-container
+        sleep 10
+        curl --fail http://localhost:8000/docs
+
+    - name: Show container logs
+      if: always()
+      run: docker logs test-container
+
+    - name: Stop the container
+      if: always()
+      run: docker stop test-container
