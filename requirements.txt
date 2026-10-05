@@ -13,3 +13,4 @@ httpx
 psycopg2-binary
 lightgbm
 pytest
+httpx2
