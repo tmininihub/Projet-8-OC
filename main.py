@@ -11,8 +11,6 @@ import time
 import psutil
 from fastapi.responses import HTMLResponse
 from HTMLProjet6 import accueil
-import sys
-sys.tracebacklimit = 0
 
 if os.path.exists("/.dockerenv"):
     load_dotenv("docker.env")
