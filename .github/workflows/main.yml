@@ -1,75 +1,47 @@
-name: Docker Image CI
+name: CI-CD
 
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
 
 jobs:
-
   test:
-    runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
+    runs-on: self-hosted
+    env:
+      URLBDD: ${{ secrets.URLBDD }}
     steps:
-    - uses: actions/checkout@v4
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Installer les dépendances
+        run: python -m pip install -r requirements.txt
+
+      - name: Lancer les tests avec couverture
+        run: python -m pytest --cov=main --cov-report=term-missing --cov-report=xml
+
+      - name: Sauvegarder le rapport de couverture
+        uses: actions/upload-artifact@v4
         with:
-          python-version: '3.11'
+          name: coverage-report
+          path: coverage.xml
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
-    - name: Install dependencies
-      run: pip install -r requirements.txt
-      - name: Connect to Tailscale
-        uses: tailscale/github-action@v4
-        with:
-          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-          tags: tag:ci
-          ping: 100.102.88.0
-
-    - name: Run tests
-      env:
-        URLBDD: postgresql://postgres:postgres@localhost:5432/postgres
-      run: pytest
-      - name: Run tests
-        env:
-          URLBDD: ${{ secrets.URLBDD }}
-        run: pytest
-
-  build-and-deploy:
+  deploy:
     needs: test
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
+    timeout-minutes: 720
+    concurrency:
+      group: scoring-api
+      cancel-in-progress: true
+    env:
+      URLBDD: ${{ secrets.URLBDD }}
     steps:
-    - uses: actions/checkout@v4
-    - name: Build the Docker image
-      run: docker build . --file Dockerfile --tag my-image-name:latest
-    - name: Run the container (simulated deployment)
-      run: |
-        docker run -d -p 8000:8000 --name test-container my-image-name:latest
-        sleep 5
-        docker stop test-container
+      - uses: actions/checkout@v4
+
+      - name: Nettoyer l'ancien conteneur
+        run: docker rm -f scoring-api
+        continue-on-error: true
+
+      - name: Construire l'image Docker
+        run: docker build -t scoring-api .
+
+      - name: Lancer l'API (Docker)
+        run: docker run --rm -p 8000:8000 -e URLBDD --name scoring-api scoring-api
