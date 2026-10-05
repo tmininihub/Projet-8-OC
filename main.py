@@ -19,16 +19,8 @@ else:
 
 URLBDD = os.getenv("URLBDD")
 model_trained = joblib.load("model_trained")
-df_total_clean = pd.read_csv("df_total_clean.csv")
 app = FastAPI()
 engine = create_engine(URLBDD)
-
-# df_total_clean.to_sql(
-#     "employes",
-#     con=engine,
-#     if_exists="replace",
-#     index=False
-# )
 
 @app.get("/", response_class=HTMLResponse)
 def home():
