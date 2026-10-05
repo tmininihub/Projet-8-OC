@@ -101,5 +101,4 @@ def Predict(SK_ID_CURR):
         index=False
     )
     print(f"Crédit Accordé : {output[0]*100:.2f}%, Crédit Refusé : {output[1]*100:.2f}%")
-
     return f"Crédit Accordé : {credit_accept:.2f}%, Crédit Refusé : {credit_decline:.2f}%", credit_accept, credit_decline
