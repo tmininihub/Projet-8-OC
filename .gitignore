@@ -3,7 +3,6 @@ __pycache__
 df_total_clean.csv
 docker.env
 local.env
-model_trained
 Projet_8_Minini_Tristan.zip
 .dockerignore
 .coverage
