@@ -4,6 +4,10 @@ on:
   push:
     branches: [ "main" ]
 
+concurrency:
+  group: scoring-api
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: self-hosted
@@ -15,24 +19,15 @@ jobs:
       - name: Installer les dépendances
         run: python -m pip install -r requirements.txt
 
-      - name: Lancer les tests avec couverture
-        run: python -m pytest --cov=main --cov-report=term-missing --cov-report=xml
-
-      - name: Sauvegarder le rapport de couverture
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: coverage.xml
+      - name: Lancer test_main.py
+        run: python -m pytest test_main.py
 
   deploy:
     needs: test
     runs-on: self-hosted
     timeout-minutes: 720
-    concurrency:
-      group: scoring-api
-      cancel-in-progress: true
     env:
-      URLBDD: ${{ secrets.DOCKERURLBDD }}
+      URLBDD: ${{ secrets.DockerURLBDD }}
     steps:
       - uses: actions/checkout@v4
 
@@ -43,5 +38,17 @@ jobs:
       - name: Construire l'image Docker
         run: docker build -t scoring-api .
 
-      - name: Lancer l'API (Docker)
-        run: docker run --rm -p 8000:8000 -e URLBDD --name scoring-api scoring-api
+      - name: Lancer l'API
+        run: docker run -d -p 8000:8000 -e URLBDD --name scoring-api scoring-api
+
+      - name: Vérifier que l'API répond
+        run: |
+          Start-Sleep -Seconds 10
+          Invoke-WebRequest -Uri http://localhost:8000/docs -UseBasicParsing
+
+      - name: Afficher les logs du conteneur
+        if: always()
+        run: docker logs scoring-api
+
+      - name: API en ligne, attente de l'arrêt
+        run: docker wait scoring-api
