@@ -1,17 +1,10 @@
-local.env
-<<<<<<< HEAD
-df_total.csv
-mlflow.db
-Projet6_Notebook.ipynb
 __pycache__
-docker.env
-=======
+.pytest_cache
 df_total_clean.csv
-mlflow.db
-Projet6_Notebook.ipynb
-__pycache__
 docker.env
+local.env
+model_trained
+Projet_8_Minini_Tristan.zip
+.dockerignore
 .coverage
-dashboard_monitoring.html
-drift_report.html
->>>>>>> 5d01075 (Changement de structure)
+.github

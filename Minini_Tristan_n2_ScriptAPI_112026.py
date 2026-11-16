@@ -27,7 +27,7 @@ def home():
     return accueil()
 
 @app.post("/Predict")
-def Predict(SK_ID_CURR):
+def Predict(SK_ID_CURR: int):
     dico_metric = {}
     start_latence = time.perf_counter()
     start_1 = time.perf_counter()
@@ -100,5 +100,7 @@ def Predict(SK_ID_CURR):
         if_exists="append",
         index=False
     )
+
+    features = df_features.to_dict(orient="records")
     print(f"Crédit Accordé : {output[0]*100:.2f}%, Crédit Refusé : {output[1]*100:.2f}%")
-    return f"Crédit Accordé : {credit_accept:.2f}%, Crédit Refusé : {credit_decline:.2f}%", credit_accept, credit_decline
+    return f"Crédit Accordé : {credit_accept:.2f}%, Crédit Refusé : {credit_decline:.2f}%", credit_accept, credit_decline, features
