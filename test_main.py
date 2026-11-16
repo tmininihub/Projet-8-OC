@@ -25,5 +25,3 @@ def test_flux():
     assert features["AMT_INCOME_TOTAL"]/12 > 0
 
     assert credit_accept + credit_decline == 100
-    
-test_flux()
