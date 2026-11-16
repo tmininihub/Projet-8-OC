@@ -10,7 +10,11 @@ import uuid
 import time
 import psutil
 from fastapi.responses import HTMLResponse
+<<<<<<< HEAD
 from HTMLProjet8 import accueil
+=======
+from Projet_8.HTMLProjet8 import accueil
+>>>>>>> 37d6fe27835cabd062860fe38878ca963df80bfd
 
 if os.path.exists("/.dockerenv"):
     load_dotenv("docker.env")

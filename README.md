@@ -1,88 +1,46 @@
-# Projet 6 OC — Déploiement et monitoring d'un modèle de scoring
+# Projet 8 OpenClassrooms — Déploiement et monitoring d'un modèle de scoring
 
-## Contexte
+## Objectif
 
-Ce projet s'inscrit dans le parcours OpenClassrooms AI Engineer. Il fait suite au projet "Initiez-vous au MLOps", dans lequel un modèle de scoring crédit a été développé, versionné et évalué.
+Mettre à disposition le modèle de scoring crédit développé dans le projet MLOps précédent, via une API FastAPI conteneurisée avec Docker. Le projet comprend des tests automatisés, un pipeline CI/CD et un suivi des données de production.
 
-L'entreprise fictive **"Prêt à Dépenser"** souhaite mettre ce modèle en production pour le département "Crédit Express", afin de traiter les nouvelles demandes de crédit en quasi temps réel. L'objectif de ce projet est donc de :
+## API et stockage
 
-- exposer le modèle de scoring via une **API fonctionnelle et déployable** (conteneurisée avec Docker),
-- mettre en place un **pipeline CI/CD** pour automatiser les tests et le déploiement,
-- préparer le **monitoring** de la solution une fois en production (stockage des données, suivi du data drift).
+L'API expose **`POST /Predict`** : à partir d'un identifiant client `SK_ID_CURR`, elle récupère ses données dans PostgreSQL, exécute la prédiction et retourne les probabilités d'accord et de refus du crédit.
 
-## Fonctionnement de l'API
+Les informations sont enregistrées dans PostgreSQL :
+- **`predictions_inputs`** : données utilisées pour les prédictions ;
+- **`predictions_outputs`** : résultats des prédictions ;
+- **`Metrics`** : temps de traitement, temps d'inférence, latence et utilisation CPU.
 
-L'API est développée avec **FastAPI** et expose deux routes principales :
+La documentation interactive de l'API est accessible via **`/docs`**.
 
-### `POST /Request`
-Reçoit les caractéristiques (features) d'un client (situation de crédit, revenus, emploi, type de logement, historique de paiement, etc.). Ces données sont stockées dans une base **PostgreSQL** (table `Project6_Features`), associées à un identifiant unique (UUID) généré à la volée. L'endpoint retourne cet identifiant.
+## Tests et CI/CD
 
-### `POST /Predict`
-Prend en paramètre l'identifiant retourné par `/Request`, récupère les features correspondantes en base, puis les passe au modèle de scoring (préalablement entraîné et chargé au démarrage de l'API via `joblib`). Le modèle renvoie une probabilité d'acceptation et de refus du crédit.
+Les tests avec **pytest** vérifient notamment les paramètres de l'API et les résultats de prédiction.
 
-Cette séparation en deux étapes (enregistrement des données, puis prédiction à partir d'un id) permet de conserver une trace de chaque demande traitée par l'API, réutilisable ensuite pour l'analyse du data drift.
+Le workflow GitHub Actions (`.github/workflows/main.yml`) est prévu pour s'exécuter à chaque push sur `main` : installation des dépendances, tests, puis construction et lancement de l'image Docker si les tests réussissent. Il utilise un runner **self-hosted** et des secrets pour la connexion à PostgreSQL.
 
-Une route `GET /` sert par ailleurs une page d'accueil statique (`index.html`).
+## Monitoring et Data Drift
 
-## Structure du dépôt
+- **`Metrics.ipynb`** et **`dashboard_monitoring.html`** : statistiques et distributions des métriques de l'API avec Evidently.
+- **`Analyse_Drift.ipynb`** et **`drift_report.html`** : comparaison des données d'entraînement avec les données enregistrées en production.
 
-```
-.
-├── main.py               # Code de l'API FastAPI (routes /Request et /Predict)
-├── test_main.py          # Tests automatisés (flux Request → Predict)
-├── index.html            # Page d'accueil de l'API
-├── model_trained          # Modèle de scoring entraîné (sérialisé avec joblib)
-├── Dockerfile             # Image Docker de l'API
-├── requirements.txt       # Dépendances Python
-├── .dockerignore
-├── .gitignore
-└── .github/workflows/      # Pipeline CI/CD (GitHub Actions)
-```
+Pour illustrer la détection du *Data Drift*, l'analyse sélectionne volontairement les clients appartenant aux 25 % de revenus les plus élevés en production. Le rapport indique **65 variables en drift sur 117 (55,56 %)**. Ce résultat illustre une différence de distribution sur ce sous-groupe et ne signifie pas que toute la production a naturellement dérivé.
 
-## Installation et lancement en local
+## Fichiers principaux du dépôt
 
-1. Cloner le dépôt :
-   ```bash
-   git clone https://github.com/tmininihub/Projet-6-OC.git
-   cd Projet-6-OC
-   ```
+| Livrable | Fichier |
+|---|---|
+| API FastAPI | `main.py` |
+| Dockerfile | `Dockerfile` |
+| Tests | `test_main.py` |
+| Pipeline CI/CD | `.github/workflows/main.yml` |
+| Analyse du Data Drift | `Analyse_Drift.ipynb` |
+| Historique des versions | Commits GitHub |
 
-2. Installer les dépendances :
-   ```bash
-   pip install -r requirements.txt
-   ```
+## Exécution
 
-3. Configurer les variables d'environnement (fichier `local.env`), notamment l'URL de connexion à la base de données :
-   ```
-   URLBDD=postgresql://<user>:<password>@<host>:<port>/<database>
-   ```
+Pour exécuter l'API ou le pipeline, les fichiers nécessaires au modèle et à l'interface doivent être disponibles dans le dossier d'exécution.
 
-4. Lancer l'API :
-   ```bash
-   uvicorn main:app --reload
-   ```
-
-L'API est alors accessible sur `http://localhost:8000`, avec la documentation interactive Swagger sur `http://localhost:8000/docs`.
-
-## Lancement avec Docker
-
-```bash
-docker build -t projet6-oc .
-docker run -p 8000:8000 --env-file docker.env projet6-oc
-```
-
-## Tests
-
-Les tests automatisés vérifient le bon fonctionnement du flux complet (envoi des features, récupération de l'id, puis prédiction) :
-
-```bash
-pytest test_main.py
-```
-
-## Intégration continue
-
-Un pipeline CI/CD (GitHub Actions, dans `.github/workflows/`) exécute automatiquement les tests et gère le déploiement à chaque push sur la branche principale.
-
-## Modèle utilisé
-
-Le modèle de scoring est un modèle **LightGBM**, entraîné dans le cadre du projet précédent (MLOps) et sérialisé au format `joblib`. Il est chargé une seule fois au démarrage de l'API afin d'éviter tout rechargement inutile à chaque requête.
+La connexion à PostgreSQL utilise la variable d'environnement `URLBDD` ; les identifiants ne doivent pas être ajoutés au dépôt.
