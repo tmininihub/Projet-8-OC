@@ -11,7 +11,6 @@ import time
 import psutil
 from fastapi.responses import HTMLResponse
 from HTMLProjet8 import accueil
-from pydantic import BaseModel, Field
 from fastapi import HTTPException
 
 if os.path.exists("/.dockerenv"):
@@ -55,7 +54,7 @@ def Predict(SK_ID_CURR: int):
     if row is None:
         raise HTTPException(
             status_code=404,
-            detail="Client introuvable, Veuillez réessayer avec un autre ID"
+            detail="Client introuvable. Veuillez réessayer avec un autre ID"
         )
     
     df_row = pd.DataFrame([row])
