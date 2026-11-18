@@ -49,6 +49,3 @@ jobs:
       - name: Afficher les logs du conteneur
         if: always()
         run: docker logs scoring-api
-
-      - name: API en ligne, attente de l'arrêt
-        run: docker wait scoring-api
