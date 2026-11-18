@@ -43,7 +43,7 @@ jobs:
 
       - name: Vérifier que l'API répond
         run: |
-          Start-Sleep -Seconds 10
+          Start-Sleep -Seconds 30
           Invoke-WebRequest -Uri http://localhost:8000/docs -UseBasicParsing
 
       - name: Afficher les logs du conteneur
