@@ -11,6 +11,8 @@ import time
 import psutil
 from fastapi.responses import HTMLResponse
 from HTMLProjet8 import accueil
+from pydantic import BaseModel, Field
+from fastapi import HTTPException
 
 if os.path.exists("/.dockerenv"):
     load_dotenv("docker.env")
@@ -22,6 +24,10 @@ model_trained = joblib.load("model_trained")
 app = FastAPI()
 engine = create_engine(URLBDD)
 
+class ClientData(BaseModel):
+    age: float = Field(ge=18)
+    revenu: float = Field(gt=0)
+
 @app.get("/", response_class=HTMLResponse)
 def home():
     return accueil()
@@ -31,27 +37,63 @@ def Predict(SK_ID_CURR: int):
     dico_metric = {}
     start_latence = time.perf_counter()
     start_1 = time.perf_counter()
-    with engine.connect() as conn:
-        result = conn.execute(
-            text('SELECT * FROM "employes" WHERE "SK_ID_CURR" = :id'),
-            {"id": SK_ID_CURR}
+
+    try :
+        with engine.connect() as conn:
+            result = conn.execute(
+                text('SELECT * FROM "employes" WHERE "SK_ID_CURR" = :id'),
+                {"id": SK_ID_CURR}
+            )
+            row = result.fetchone()
+    except Exception as e:
+        print(e)
+        raise HTTPException(
+            status_code=500,
+            detail="Erreur lors de la récupération du client dans PostgreSQL"
         )
-        row = result.fetchone()
+    
+    if row is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Client introuvable, Veuillez réessayer avec un autre ID"
+        )
+    
     df_row = pd.DataFrame([row])
+
+    try:
+        ClientData(
+            age=df_row["DAYS_BIRTH"][0] / (-365),
+            revenu=df_row["AMT_INCOME_TOTAL"][0]
+        )
+    except Exception as e:
+        print(e)
+        raise HTTPException(
+            status_code=500,
+            detail="Données client invalides"
+        )
+    
+    start_2 = time.perf_counter()
     df_features = pd.DataFrame([row])
     df_features = df_features.drop(columns=['SK_ID_CURR','TARGET'])
 
-    df_row.to_sql(
-    "predictions_inputs",
-    con=engine,
-    if_exists="append",
-    index=False
-    )
+    try :
+        df_row.to_sql(
+        "predictions_inputs",
+        con=engine,
+        if_exists="append",
+        index=False
+        )
+    except Exception as e:
+        print(e)
+        raise HTTPException(
+            status_code=500,
+            detail="Erreur lors de l'envoi de predictions_inputs dans PostgreSQL"
+        )
+    
     stop_1 = time.perf_counter()
     diff_1 = stop_1 - start_1
     print(f"Temps engine : {diff_1}")
     dico_metric["Temps engine"] = diff_1
-    start_2 = time.perf_counter()
     stop_2 = time.perf_counter()
     diff_2 = stop_2 - start_2
     print(f"Temps DF : {diff_2}")
@@ -77,13 +119,21 @@ def Predict(SK_ID_CURR: int):
     df_outputs["credit_accept"] = output[0]*100
     df_outputs["credit_decline"] = output[1]*100
     df_outputs = pd.DataFrame([df_outputs])
+
+    try:
+        df_outputs.to_sql(
+        "predictions_outputs",
+        con=engine,
+        if_exists="append",
+        index=False
+        )
+    except Exception as e:
+        print(e)
+        raise HTTPException(
+            status_code=500,
+            detail="Erreur lors de l'envoi de predictions_outputs dans PostgreSQL"
+        )
     
-    df_outputs.to_sql(
-    "predictions_outputs",
-    con=engine,
-    if_exists="append",
-    index=False
-    )
     stop_latence = time.perf_counter()
     latence = stop_latence - start_latence
     stop_3 = time.perf_counter()
@@ -94,12 +144,19 @@ def Predict(SK_ID_CURR: int):
     dico_metric["Latence Requête"] = latence
     df_metric = pd.DataFrame([dico_metric])
 
-    df_metric.to_sql(
-        "Metrics",
-        con=engine,
-        if_exists="append",
-        index=False
-    )
+    try: 
+        df_metric.to_sql(
+            "Metrics",
+            con=engine,
+            if_exists="append",
+            index=False
+        )
+    except Exception as e:
+        print(e)
+        raise HTTPException(
+            status_code=500,
+            detail="Erreur lors de l'envoi de Metrics dans PostgreSQL"
+        )
 
     features = df_features.to_dict(orient="records")
     print(f"Crédit Accordé : {output[0]*100:.2f}%, Crédit Refusé : {output[1]*100:.2f}%")
